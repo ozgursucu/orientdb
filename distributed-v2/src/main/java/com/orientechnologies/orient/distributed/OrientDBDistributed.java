@@ -17,9 +17,11 @@ import com.orientechnologies.orient.distributed.impl.coordinator.transaction.OSe
 import com.orientechnologies.orient.distributed.impl.metadata.ODistributedContext;
 import com.orientechnologies.orient.distributed.impl.metadata.OSharedContextDistributed;
 import com.orientechnologies.orient.distributed.impl.structural.*;
-import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitRequest;
-import com.orientechnologies.orient.distributed.impl.structural.operations.OCreateDatabaseSubmitResponse;
-import com.orientechnologies.orient.distributed.impl.structural.operations.ODropDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.operations.ODatabaseLastOpIdRequest;
+import com.orientechnologies.orient.distributed.impl.structural.submit.OCreateDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.submit.OCreateDatabaseSubmitResponse;
+import com.orientechnologies.orient.distributed.impl.structural.submit.ODropDatabaseSubmitRequest;
+import com.orientechnologies.orient.distributed.impl.structural.submit.OSyncRequest;
 import com.orientechnologies.orient.distributed.impl.structural.raft.OStructuralFollower;
 import com.orientechnologies.orient.enterprise.channel.binary.OChannelBinary;
 import com.orientechnologies.orient.server.*;
@@ -48,6 +50,7 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
   private          ODistributedNetworkManager    networkManager;
   private          ONodeConfiguration            nodeConfiguration;
   private          OStructuralConfiguration      structuralConfiguration;
+  private          OElectionContext              elections;
 
   public OrientDBDistributed(String directoryPath, OrientDBConfig config, Orient instance) {
     super(directoryPath, config, instance);
@@ -201,6 +204,12 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
     }
     //This initialize the distributed configuration.
     checkCoordinator(name);
+    electLeader(name);
+  }
+
+  private void electLeader(String name) {
+    int term = elections.startElection(name);
+    getNetworkManager().sendAll(getActiveNodes(), new ODatabaseLastOpIdRequest(name, term));
   }
 
   @Override
@@ -452,5 +461,9 @@ public class OrientDBDistributed extends OrientDBEmbedded implements OServerAwar
 
   public OSharedContextDistributed getSharedContext(String database) {
     return (OSharedContextDistributed) sharedContexts.get(database);
+  }
+
+  public OElectionContext getElections() {
+    return elections;
   }
 }
